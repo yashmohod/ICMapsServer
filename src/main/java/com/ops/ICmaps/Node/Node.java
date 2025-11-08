@@ -1,49 +1,82 @@
 package com.ops.ICmaps.Node;
 
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import com.ops.ICmaps.Edge.Edge;
+import com.ops.ICmaps.NavMode.NavMode;
+import jakarta.persistence.*;
+
+import java.util.*;
 
 @Entity
-@Table(name = "Nodes")
+@Table(name = "nodes", indexes = {
+        @Index(name = "idx_nodes_lat_lng", columnList = "lat,lng")
+})
 public class Node {
     @Id
-    @Column(name = "id", unique = true )
     private String id;
-    private Float lat;
-    private Float lng;
+    private Double lat;
+    private Double lng;
 
-    public Node(String id, Float lat, Float lng) {
-        this.id = id;
-        this.lat = lat;
+    @ManyToMany
+    @JoinTable(
+            name = "person_friends", // Name of the join table
+            joinColumns = @JoinColumn(name = "person_id"), // Foreign key for this entity
+            inverseJoinColumns = @JoinColumn(name = "friend_id") // Foreign key for the related entity (also Person)
+    )
+    private Set<Node> neighbours = new HashSet<>();
+
+    // Bidirectional convenience: edges starting from this node
+    @OneToMany(mappedBy = "fromNode", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Edge> outgoingEdges = new ArrayList<>();
+
+    // and edges ending at this node
+    @OneToMany(mappedBy = "toNode", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Edge> incomingEdges = new ArrayList<>();
+
+    @ManyToMany(mappedBy = "nodes")
+    Set<NavMode> navModes;
+
+    @ManyToMany(mappedBy = "nodes")
+    Set<NavMode> buildings;
+
+    protected Node() {
+    }
+
+    public Node(String id,Double lng, Double lat) {
         this.lng = lng;
+        this.lat = lat;
+        this.id = id;
     }
 
     public String getId() {
         return id;
     }
 
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public Float getLat() {
+    public Double getLat() {
         return lat;
     }
 
-    public void setLat(Float lat) {
+    public void setLat(Double lat) {
         this.lat = lat;
     }
 
-    public Float getLng() {
+    public Double getLng() {
         return lng;
     }
 
-    public void setLng(Float lng) {
+    public void setLng(Double lng) {
         this.lng = lng;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        Node node = (Node) o;
+        return Objects.equals(id, node.id) && Objects.equals(lat, node.lat) && Objects.equals(lng, node.lng);
+    }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, lat, lng);
+    }
 }
