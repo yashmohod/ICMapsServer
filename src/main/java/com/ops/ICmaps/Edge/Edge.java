@@ -7,8 +7,8 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "edges", indexes = {
-        @Index(name = "idx_edges_from", columnList = "from_node_id"),
-        @Index(name = "idx_edges_to", columnList = "to_node_id")
+    @Index(name = "idx_edges_from", columnList = "from_node_id"),
+    @Index(name = "idx_edges_to", columnList = "to_node_id")
 })
 public class Edge {
 
@@ -35,19 +35,35 @@ public class Edge {
         return key;
     }
 
+    public String getFromNode() {
+        return this.fromNode;
+    }
 
+    public void setFromNode(String fromNode) {
+        this.fromNode = fromNode;
+    }
 
-    public double getDistanceMeters() {
+    public String getToNode() {
+        return this.toNode;
+    }
+
+    public void setToNode(String toNode) {
+        this.toNode = toNode;
+    }
+
+    public double getDistance() {
         return distanceMeters;
     }
 
-    public void setDistanceMeters(double distanceMeters) {
+    public void setDistance(double distanceMeters) {
         this.distanceMeters = distanceMeters;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         Edge edge = (Edge) o;
         return Double.compare(distanceMeters, edge.distanceMeters) == 0 && Objects.equals(key, edge.key) && Objects.equals(fromNode, edge.fromNode) && Objects.equals(toNode, edge.toNode);
     }

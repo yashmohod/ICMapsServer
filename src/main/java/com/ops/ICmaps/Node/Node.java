@@ -1,6 +1,5 @@
 package com.ops.ICmaps.Node;
 
-
 import com.ops.ICmaps.Edge.Edge;
 import com.ops.ICmaps.NavMode.NavMode;
 import jakarta.persistence.*;
@@ -9,9 +8,10 @@ import java.util.*;
 
 @Entity
 @Table(name = "nodes", indexes = {
-        @Index(name = "idx_nodes_lat_lng", columnList = "lat,lng")
+    @Index(name = "idx_nodes_lat_lng", columnList = "lat,lng")
 })
 public class Node {
+
     @Id
     private String id;
     private Double lat;
@@ -25,14 +25,6 @@ public class Node {
     )
     private Set<Node> neighbours = new HashSet<>();
 
-    // Bidirectional convenience: edges starting from this node
-    @OneToMany(mappedBy = "fromNode", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Edge> outgoingEdges = new ArrayList<>();
-
-    // and edges ending at this node
-    @OneToMany(mappedBy = "toNode", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Edge> incomingEdges = new ArrayList<>();
-
     @ManyToMany(mappedBy = "nodes")
     Set<NavMode> navModes;
 
@@ -42,7 +34,7 @@ public class Node {
     protected Node() {
     }
 
-    public Node(String id,Double lng, Double lat) {
+    public Node(String id, Double lng, Double lat) {
         this.lng = lng;
         this.lat = lat;
         this.id = id;
@@ -70,7 +62,9 @@ public class Node {
 
     @Override
     public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         Node node = (Node) o;
         return Objects.equals(id, node.id) && Objects.equals(lat, node.lat) && Objects.equals(lng, node.lng);
     }
