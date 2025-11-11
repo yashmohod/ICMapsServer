@@ -116,6 +116,8 @@ public class GraphService {
             Node curr = q.poll();
             res.add(curr);
 
+            List<Adj> adjecent = neighbors
+
             // visit all the unvisited
             // neighbours of current node
             for (int x : adj.get(curr)) {
