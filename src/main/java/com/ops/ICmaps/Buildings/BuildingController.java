@@ -1,6 +1,7 @@
 package com.ops.ICmaps.Buildings;
 
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -79,11 +80,21 @@ public class BuildingController {
         return objectNode;
     }
 
+    public record BuildingsDTO(Long id, String name) {
+
+    }
+
     @GetMapping("/")
     public ObjectNode GetAllBuildings() {
         ObjectNode objectNode = objectMapper.createObjectNode();
         List<Building> allBuildings = br.findAll();
-        objectNode.set("buildings", objectMapper.valueToTree(allBuildings));
+        List<BuildingsDTO> NavmodeDTOs = allBuildings.stream()
+                .map(e -> new BuildingsDTO(
+                        e.getId(),
+                        e.getName()))
+                .toList();
+
+        objectNode.set("buildings", objectMapper.valueToTree(NavmodeDTOs));
         return objectNode;
     }
 
@@ -99,7 +110,7 @@ public class BuildingController {
     public ObjectNode GetBuildingPos(@RequestParam Long id) {
         ObjectNode objectNode = objectMapper.createObjectNode();
         Building building = br.findById(id).get();
-        Node[] nodes = (Node[]) building.getNodes().toArray();
+        Set<Node> nodes = building.getNodes();
 
         double x = 0;
         double y = 0;
@@ -113,9 +124,9 @@ public class BuildingController {
             z += Math.sin(lat_rad);
         }
 
-        x /= nodes.length;
-        y /= nodes.length;
-        z /= nodes.length;
+        x /= nodes.size();
+        y /= nodes.size();
+        z /= nodes.size();
         double hyp = Math.sqrt(x * x + y * y);
         double lat = Math.toDegrees(Math.atan2(z, hyp));
         double lng = Math.toDegrees(Math.atan2(y, x));

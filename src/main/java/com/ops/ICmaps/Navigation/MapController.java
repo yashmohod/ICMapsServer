@@ -3,6 +3,7 @@ package com.ops.ICmaps.Navigation;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,6 +21,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.ops.ICmaps.Edge.Edge;
 import com.ops.ICmaps.Edge.EdgeRepository;
+import com.ops.ICmaps.NavMode.NavMode;
+import com.ops.ICmaps.NavMode.NavModeRepository;
 import com.ops.ICmaps.Navigation.GraphService.Adj;
 import com.ops.ICmaps.Node.Node;
 import com.ops.ICmaps.Node.NodeRepository;
@@ -35,12 +39,43 @@ public class MapController {
     private final EdgeRepository er;
     private final ObjectMapper objectMapper;
     private final GraphService gs;
+    private final NavModeRepository navr;
 
-    public MapController(GraphService gs, EdgeRepository er, NodeRepository nr, ObjectMapper objectMapper) {
+    public MapController(NavModeRepository navr, GraphService gs, EdgeRepository er, NodeRepository nr,
+            ObjectMapper objectMapper) {
         this.nr = nr;
         this.er = er;
         this.gs = gs;
+        this.navr = navr;
         this.objectMapper = objectMapper;
+    }
+
+    @GetMapping("/allpedes")
+    public ObjectNode MakeAllPedes() {
+        ObjectNode objectNode = objectMapper.createObjectNode();
+        Long c = 1L;
+        NavMode curnavMode = navr.findById(c).get();
+
+        List<Node> nodes = nr.findAll();
+        for (Node cur : nodes) {
+            if (!cur.getNavModes().contains(curnavMode)) {
+                cur.AddNavMode(curnavMode);
+            }
+        }
+        nr.saveAll(nodes);
+        List<Edge> edges = er.findAll();
+        for (Edge cur : edges) {
+            if (!cur.getNavModes().contains(curnavMode)) {
+                cur.AddNavMode(curnavMode);
+            }
+        }
+
+        er.saveAll(edges);
+        nr.saveAll(nodes);
+        navr.save(curnavMode);
+        gs.loadGraph();
+        objectNode.put("message", "Found it!");
+        return objectNode;
     }
 
     @GetMapping("/")
@@ -50,15 +85,16 @@ public class MapController {
         return objectNode;
     }
 
-    @GetMapping("/routeto")
-    public ObjectNode Route(ObjectNode args) {
+    @GetMapping("/navigateTo")
+    public ObjectNode RouteTo(@RequestParam Long id,
+            @RequestParam Long navMode,
+            @RequestParam Double lat,
+            @RequestParam Double lng) {
         ObjectNode objectNode = objectMapper.createObjectNode();
-        double lat = args.get("lat").asDouble();
-        double lng = args.get("lng").asDouble();
-        Long navModeId = args.get("navMode").asLong();
-        Long buildingId = args.get("navMode").asLong();
 
-        String[] path = gs.navigate(lat, lng, buildingId, navModeId);
+        System.out.println(lat + " " + lng + " " + navMode + " " + id);
+        System.out.println("everything fine here");
+        Set<String> path = gs.navigate(lat, lng, id, navMode);
         objectNode.set("path", objectMapper.valueToTree(path));
         return objectNode;
     }

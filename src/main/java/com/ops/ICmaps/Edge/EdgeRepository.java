@@ -15,4 +15,7 @@ public interface EdgeRepository extends JpaRepository<Edge, String> {
 
     List<Edge> findByToNode(String toNode);
 
+    @Query("select distinct e from Edge e left join fetch e.navModes")
+    List<Edge> findAllWithNavModes();
+
 }

@@ -10,10 +10,12 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.ops.ICmaps.Buildings.BuildingRepository;
 import com.ops.ICmaps.Edge.Edge;
@@ -44,7 +46,8 @@ public class GraphService {
         this.nodes = nodes;
     }
 
-    public static record Adj(String to, double distance, Set<NavMode> navModes) {
+    public static record Adj(String to, double distance, Set<Long> navModes) {
+
     }
 
     public Map<String, List<Adj>> getGraph() {
@@ -80,24 +83,29 @@ public class GraphService {
 
     private static double haversineSquared(double lat1, double lon1, double lat2,
             double lon2) {
-        // You can return actual meters too; squared used only if you compare.
-        double R = 6371000.0;
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                        * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+        // // You can return actual meters too; squared used only if you compare.
+        // double R = 6371000.0;
+        // double dLat = Math.toRadians(lat2 - lat1);
+        // double dLon = Math.toRadians(lon2 - lon1);
+        // double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+        // + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+        // * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        // return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+        return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon2 - lon1, 2));
     }
 
+    @Transactional(readOnly = true)
     private void rebuild() {
         Map<String, List<Adj>> map = new HashMap<>();
 
-        for (Edge e : edges.findAll()) {
+        for (Edge e : edges.findAllWithNavModes()) {
+            Set<Long> navModesIds = e.getNavModes().stream()
+                    .map(NavMode::getId)
+                    .collect(Collectors.toUnmodifiableSet());
             map.computeIfAbsent(e.getFromNode(), k -> new ArrayList<>())
-                    .add(new Adj(e.getToNode(), e.getDistance(), e.getNavModes()));
+                    .add(new Adj(e.getToNode(), e.getDistance(), navModesIds));
             map.computeIfAbsent(e.getToNode(), k -> new ArrayList<>())
-                    .add(new Adj(e.getFromNode(), e.getDistance(), e.getNavModes()));
+                    .add(new Adj(e.getFromNode(), e.getDistance(), navModesIds));
         }
 
         // freeze lists + map for thread safety, zero lock reads
@@ -110,23 +118,40 @@ public class GraphService {
         return adj.getOrDefault(fromId, List.of());
     }
 
-    public String[] navigate(double lat, double lng, Long DestinationId, Long navModeId) {
+    public Set<String> navigate(double lat, double lng, Long DestinationId, Long navModeId) {
 
         String startId = nearestNodeId(lat, lng);
         NavMode pathNavMode = navr.findById(navModeId).get();
         Set<Node> destinationNodes = building.findById(DestinationId).get().getNodes();
 
-        Map<String, String> path = Astar(startId, destinationNodes, pathNavMode);
-        String cur = startId;
-        String pathEdges[] = new String[path.size() - 1];
-        for (int i = 0; i < pathEdges.length - 1; i += 1) {
+        System.out.println(startId);
+        System.out.println(pathNavMode.getName());
+        System.out.println(destinationNodes.size());
+
+        Map<String, String> path = Astar(startId, destinationNodes, navModeId);
+        System.out.println("************");
+        System.out.println(path);
+        System.out.println("************");
+
+        String cur = "";
+        for (Node curNode : destinationNodes) {
+            if (path.keySet().contains(curNode.getId())) {
+                cur = curNode.getId();
+            }
+        }
+
+        Set<String> pathEdges = new HashSet<>();
+        for (int i = 0; i < path.size() - 1; i += 1) {
             String nxt = path.get(cur);
+            System.out.println(cur + " " + nxt);
             if (!edges.findByFromNodeAndToNode(cur, nxt).isEmpty()) {
-
+                // System.out.println(edges.findByFromNodeAndToNode(cur, nxt).get(0).getKey());
+                pathEdges.add(edges.findByFromNodeAndToNode(cur, nxt).get(0).getKey());
             } else if (!edges.findByFromNodeAndToNode(nxt, cur).isEmpty()) {
-
+                // System.out.println(edges.findByFromNodeAndToNode(nxt, cur).get(0).getKey());
+                pathEdges.add(edges.findByFromNodeAndToNode(nxt, cur).get(0).getKey());
             } else {
-                return null;
+                System.out.println("OOOOHhh NNNOOO!");
             }
             cur = nxt;
         }
@@ -134,10 +159,7 @@ public class GraphService {
         return pathEdges;
     }
 
-    private Map<String, String> Astar(String start, Set<Node> end, NavMode pathNavMode) {
-        if (start.equals(end)) {
-            return null;
-        }
+    private Map<String, String> Astar(String start, Set<Node> end, Long pathNavModeId) {
 
         Double endLat = 0.0;
         Double endLng = 0.0;
@@ -148,6 +170,9 @@ public class GraphService {
             endLat += cur.getLat();
             endLng += cur.getLng();
             ends.add(cur.getId());
+        }
+        if (ends.contains(start)) {
+            return null;
         }
 
         endLat /= N;
@@ -168,8 +193,15 @@ public class GraphService {
             String cur = open.poll().id();
             if (!closed.add(cur))
                 continue; // skip if already expanded
-            if (ends.contains(cur))
+            if (ends.contains(cur)) {
+                System.out.println("found the end");
+                System.out.println("found the end");
+                System.out.println("found the end");
+                System.out.println("found the end");
+                System.out.println("found the end");
+                System.out.println(cur);
                 return parent;
+            }
 
             for (Adj e : neighbors(cur)) {
                 String nxt = e.to(); // Adj(to, distance)
@@ -177,14 +209,16 @@ public class GraphService {
                     continue;
 
                 double tentative = g.get(cur) + e.distance();
-                if ((tentative < g.getOrDefault(nxt, Double.POSITIVE_INFINITY)) && e.navModes.contains(pathNavMode)) {
+                if ((tentative < g.getOrDefault(nxt, Double.POSITIVE_INFINITY))
+                        && e.navModes.contains(pathNavModeId)) {
                     g.put(nxt, tentative);
-                    parent.put(cur, nxt);
+                    parent.put(nxt, cur);
                     double f = tentative + heuristic(nxt, endLat, endLng);
                     open.add(new State(nxt, f));
                 }
             }
         }
+
         return null;
     }
 
