@@ -97,10 +97,11 @@ public class GraphService {
     private void rebuild() {
         Map<String, List<Adj>> map = new HashMap<>();
 
-        for (Edge e : edges.findAllWithNavModes()) {
+        for (Edge e : edges.findCampusEdgesWithNavModes()) {
             Set<Long> navModesIds = e.getNavModes().stream()
                     .map(NavMode::getId)
                     .collect(Collectors.toUnmodifiableSet());
+
             if (e.isBiDirectional()) {
                 map.computeIfAbsent(e.getFromNode(), k -> new ArrayList<>())
                         .add(new Adj(e.getToNode(), e.getDistance(), navModesIds,false));
@@ -114,6 +115,7 @@ public class GraphService {
         }
 
         for (Edge e : edges.findByInterBuildingEdge(true)) {
+
 
             map.computeIfAbsent(e.getFromNode(), k -> new ArrayList<>())
                     .add(new Adj(e.getToNode(), e.getDistance(), new HashSet<Long>(),true));
@@ -194,7 +196,9 @@ public class GraphService {
 
         String startId = nearestNodeId(lat, lng);
         NavMode pathNavMode = navr.findById(navModeId).get();
-        Set<Node> destinationNodes = building.findById(DestinationId).get().getNodes();
+        Set<Node> destinationNodes = destinationNodes = building.findById(DestinationId).get().getNodes();
+
+        
 
         System.out.println("StartID:"+startId);
         System.out.println("NavMode :"+pathNavMode.getName());
@@ -237,6 +241,12 @@ public class GraphService {
     }
 
     private Map<String, String> Astar(String start, Set<Node> end, Long pathNavModeId, boolean anyNavMode) {
+        
+        Boolean curNavMode =false;
+
+        if(pathNavModeId>-1){
+            curNavMode = navr.getReferenceById(pathNavModeId).isFromThrough();
+        }
 
         Double endLat = 0.0;
         Double endLng = 0.0;
@@ -269,22 +279,22 @@ public class GraphService {
         while (!open.isEmpty()) {
             String cur = open.poll().id();
             if (!closed.add(cur))
-                continue; // skip if already expanded
+                continue; 
             if (ends.contains(cur)) {
-                // System.out.println("found the end");
-                // System.out.println("found the end");
-                // System.out.println(cur);
+
                 return parent;
             }
 
             for (Adj e : neighbors(cur)) {
-                // System.out.println(e.to());
-                String nxt = e.to(); // Adj(to, distance)
+                String nxt = e.to(); 
                 if (closed.contains(nxt))
                     continue;
 
                 double tentative = g.get(cur) + e.distance();
-                if ((tentative < g.getOrDefault(nxt, Double.POSITIVE_INFINITY)) && (e.navModes.contains(pathNavModeId)|| e.fromThrough || anyNavMode)) {
+                if ((tentative < g.getOrDefault(nxt, Double.POSITIVE_INFINITY)) 
+                    && (e.navModes.contains(pathNavModeId)
+                    || (e.fromThrough && curNavMode ) 
+                    || (!e.fromThrough && anyNavMode))) {
                     g.put(nxt, tentative);
                     parent.put(nxt, cur);
                     double f = tentative + heuristic(nxt, endLat, endLng);

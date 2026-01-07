@@ -65,6 +65,7 @@ public class NavModeController {
 
         String respMessage = navr.findById(newNavMode.getId()).map(curNavMode -> {
             curNavMode.setName(newNavMode.getName());
+            curNavMode.setIsFromThrough(newNavMode.isFromThrough());
             navr.save(curNavMode);
             return "NavMode name update!";
         }).orElseGet(() -> {
@@ -210,7 +211,6 @@ public class NavModeController {
     public ObjectNode GetAllFeatures(@RequestParam Long navModeId) {
         ObjectNode objectNode = objectMapper.createObjectNode();
         NavMode curNavMode = navr.findById(navModeId).get();
-        System.out.println("here is the nav mode id :" + curNavMode);
         Set<Node> nodes = curNavMode.getNodes();
         Set<Edge> edges = curNavMode.getEdges();
 
